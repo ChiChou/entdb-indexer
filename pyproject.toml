@@ -1,0 +1,12 @@
+[project]
+name = "entdb-indexer"
+version = "0.1.0"
+description = "Crontab workflow to discover and index entitlements from Apple firmware"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyhpke>=0.6.2",
+]
+
+[tool.ruff]
+extend-exclude = ["aeota"]

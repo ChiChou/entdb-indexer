@@ -1,0 +1,13 @@
+*.db
+*.db.bak
+
+cache/
+output/
+output-*/
+
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+.ruff_cache/
+.venv/
