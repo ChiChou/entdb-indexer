@@ -4,11 +4,6 @@ on:
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
-    inputs:
-      batch_size:
-        description: "Number of firmwares per job"
-        default: "3"
-        type: string
 
 permissions:
   contents: read
@@ -17,100 +12,8 @@ env:
   DATA_REPO: ChiChou/entdb-data
 
 jobs:
-  discover:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix_ios: ${{ steps.discover_ios.outputs.matrix }}
-      matrix_mac: ${{ steps.discover_mac.outputs.matrix }}
-      has_work: ${{ steps.check.outputs.has_work }}
-    steps:
-      - name: Checkout indexer
-        uses: actions/checkout@v4
-
-      - name: Checkout data repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.DATA_REPO }}
-          path: entdb-data
-          token: ${{ secrets.DATA_REPO_TOKEN }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install dependencies
-        run: pip install pyhpke
-
-      - name: Discover missing iOS versions
-        id: discover_ios
-        run: |
-          BATCH_SIZE="${{ inputs.batch_size || '3' }}"
-          MATRIX=$(python -c "
-          from stages.discover import fetch_ios_firmwares, find_missing, split_into_batches
-          from pathlib import Path
-          import json
-
-          firmwares = fetch_ios_firmwares(Path('cache'))
-          missing = find_missing(firmwares, Path('entdb-data'), 'iOS')
-          if not missing:
-              print(json.dumps({'include': []}))
-          else:
-              batches = split_into_batches(missing, int('$BATCH_SIZE'))
-              matrix = {
-                  'include': [
-                      {'batch_index': i, 'batch': json.dumps(batch)}
-                      for i, batch in enumerate(batches)
-                  ]
-              }
-              print(json.dumps(matrix))
-          ")
-          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-
-      - name: Discover missing macOS versions
-        id: discover_mac
-        run: |
-          BATCH_SIZE="${{ inputs.batch_size || '3' }}"
-          MATRIX=$(python -c "
-          from stages.discover import fetch_mac_firmwares, find_missing, split_into_batches
-          from pathlib import Path
-          import json
-
-          firmwares = fetch_mac_firmwares(Path('cache'))
-          missing = find_missing(firmwares, Path('entdb-data'), 'mac')
-          if not missing:
-              print(json.dumps({'include': []}))
-          else:
-              batches = split_into_batches(missing, int('$BATCH_SIZE'))
-              matrix = {
-                  'include': [
-                      {'batch_index': i, 'batch': json.dumps(batch)}
-                      for i, batch in enumerate(batches)
-                  ]
-              }
-              print(json.dumps(matrix))
-          ")
-          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-
-      - name: Check if there is work
-        id: check
-        run: |
-          IOS='${{ steps.discover_ios.outputs.matrix }}'
-          MAC='${{ steps.discover_mac.outputs.matrix }}'
-          if echo "$IOS$MAC" | python -c "import sys, json; d1=json.loads(sys.argv[1]); d2=json.loads(sys.argv[2]); sys.exit(0 if d1['include'] or d2['include'] else 1)" "$IOS" "$MAC"; then
-            echo "has_work=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_work=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  process-ios:
-    needs: discover
-    if: needs.discover.outputs.has_work == 'true'
+  update:
     runs-on: macos-latest
-    strategy:
-      matrix: ${{ fromJson(needs.discover.outputs.matrix_ios) }}
-      fail-fast: false
-      max-parallel: 2
     steps:
       - name: Checkout indexer
         uses: actions/checkout@v4
@@ -130,41 +33,8 @@ jobs:
       - name: Install Python dependencies
         run: pip install pyhpke
 
-      - name: Process iOS batch
-        working-directory: .
-        run: |
-          BATCH='${{ matrix.batch }}'
-          echo "$BATCH" | python -c "
-          import sys, json, subprocess, tempfile
-          from pathlib import Path
-
-          batch = json.load(sys.stdin)
-          for fw in batch:
-              version = fw['version']
-              build = fw['build']
-              url = fw['url']
-              tag = f'{version}_{build}'
-
-              print(f'Processing iOS {tag}...')
-
-              with tempfile.TemporaryDirectory() as tmpdir:
-                  ipsw_path = Path(tmpdir) / 'firmware.ipsw'
-                  db_path = Path(tmpdir) / f'{tag}.db'
-
-                  subprocess.check_call(['curl', '-L', '-o', str(ipsw_path), url])
-
-                  subprocess.check_call([
-                      sys.executable, 'ipsw-db.py',
-                      str(ipsw_path), '-o', tmpdir,
-                  ])
-
-                  subprocess.check_call([
-                      sys.executable, 'cli.py', 'export-xml',
-                      str(db_path), '-o', 'entdb-data', '-g', 'iOS',
-                  ])
-
-              print(f'Done: iOS {tag}')
-          "
+      - name: Discover and process new entries
+        run: python run.py
 
       - name: Commit and push
         working-directory: entdb-data
@@ -178,88 +48,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "update: iOS batch ${{ matrix.batch_index }} — $(date -u +%Y-%m-%d)"
-          for i in 1 2 3; do
-            git pull --rebase && git push && break
-            sleep $((i * 5))
-          done
-
-  process-mac:
-    needs: discover
-    if: needs.discover.outputs.has_work == 'true'
-    runs-on: macos-latest
-    strategy:
-      matrix: ${{ fromJson(needs.discover.outputs.matrix_mac) }}
-      fail-fast: false
-      max-parallel: 2
-    steps:
-      - name: Checkout indexer
-        uses: actions/checkout@v4
-
-      - name: Checkout data repo
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.DATA_REPO }}
-          path: entdb-data
-          token: ${{ secrets.DATA_REPO_TOKEN }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install Python dependencies
-        run: pip install pyhpke
-
-      - name: Process macOS batch
-        working-directory: .
-        run: |
-          BATCH='${{ matrix.batch }}'
-          echo "$BATCH" | python -c "
-          import sys, json, subprocess, tempfile
-          from pathlib import Path
-
-          batch = json.load(sys.stdin)
-          for fw in batch:
-              version = fw['version']
-              build = fw['build']
-              url = fw['url']
-              tag = f'{version}_{build}'
-
-              print(f'Processing macOS {tag}...')
-
-              with tempfile.TemporaryDirectory() as tmpdir:
-                  ipsw_path = Path(tmpdir) / 'firmware.ipsw'
-                  db_path = Path(tmpdir) / f'{tag}.db'
-
-                  subprocess.check_call(['curl', '-L', '-o', str(ipsw_path), url])
-
-                  subprocess.check_call([
-                      sys.executable, 'ipsw-db.py',
-                      str(ipsw_path), '-o', tmpdir,
-                  ])
-
-                  subprocess.check_call([
-                      sys.executable, 'cli.py', 'export-xml',
-                      str(db_path), '-o', 'entdb-data', '-g', 'mac',
-                  ])
-
-              print(f'Done: macOS {tag}')
-          "
-
-      - name: Commit and push
-        working-directory: entdb-data
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "update: macOS batch ${{ matrix.batch_index }} — $(date -u +%Y-%m-%d)"
+          git commit -m "update: $(date -u +%Y-%m-%d)"
           for i in 1 2 3; do
             git pull --rebase && git push && break
             sleep $((i * 5))
