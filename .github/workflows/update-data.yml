@@ -10,6 +10,9 @@ on:
         default: "3"
         type: string
 
+permissions:
+  contents: read
+
 env:
   DATA_REPO: ChiChou/entdb-data
 
@@ -29,6 +32,7 @@ jobs:
         with:
           repository: ${{ env.DATA_REPO }}
           path: entdb-data
+          token: ${{ secrets.DATA_REPO_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -116,6 +120,7 @@ jobs:
         with:
           repository: ${{ env.DATA_REPO }}
           path: entdb-data
+          token: ${{ secrets.DATA_REPO_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -196,6 +201,7 @@ jobs:
         with:
           repository: ${{ env.DATA_REPO }}
           path: entdb-data
+          token: ${{ secrets.DATA_REPO_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
