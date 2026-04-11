@@ -110,18 +110,12 @@ def find_missing(firmwares: list[dict], data_repo: Path, group: str) -> list[dic
 
     group_dir = data_repo / group
     if group_dir.exists():
-        list_path = group_dir / "list.json"
-        if list_path.exists():
-            with list_path.open() as fp:
-                for entry in json.load(fp):
-                    existing_builds.add(entry["build"])
-        else:
-            for d in group_dir.iterdir():
-                if d.is_dir():
-                    meta = d / "meta.json"
-                    if meta.exists():
-                        with meta.open() as fp:
-                            existing_builds.add(json.load(fp)["build"])
+        for d in group_dir.iterdir():
+            if d.is_dir():
+                meta = d / "meta.json"
+                if meta.exists():
+                    with meta.open() as fp:
+                        existing_builds.add(json.load(fp)["build"])
 
     return [fw for fw in firmwares if fw["build"] not in existing_builds]
 

@@ -8,8 +8,27 @@ from pathlib import Path
 from indexer.db import Reader, Writer
 
 
+def _update_list_json(group_dir: Path, new_entries: list[dict]):
+    list_path = group_dir / "list.json"
+    existing = []
+    if list_path.exists():
+        with list_path.open() as fp:
+            existing = json.load(fp)
+
+    existing_builds = {e["build"] for e in existing}
+    for entry in new_entries:
+        if entry["build"] not in existing_builds:
+            existing.append(entry)
+            existing_builds.add(entry["build"])
+
+    with list_path.open("w") as fp:
+        json.dump(existing, fp, indent=2)
+        fp.write("\n")
+
+
 def export_xml(db_path: str, output: Path, group: str):
     reader = Reader(db_path)
+    new_entries = []
 
     for os_info in reader.all_os():
         build = os_info["build"]
@@ -40,7 +59,12 @@ def export_xml(db_path: str, output: Path, group: str):
             xml_path.parent.mkdir(parents=True, exist_ok=True)
             xml_path.write_bytes(b["xml"])
 
+        new_entries.append(os_info)
         print(f"exported {group}/{tag}")
+
+    group_dir = output / group
+    group_dir.mkdir(parents=True, exist_ok=True)
+    _update_list_json(group_dir, new_entries)
 
 
 def main():
