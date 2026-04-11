@@ -102,7 +102,20 @@ def fetch_mac_firmwares(cache_dir: Path) -> list[dict]:
                     "releasedate": fw.get("releasedate", ""),
                 }
 
-    return list(unified.values())
+    groups = defaultdict(list)
+    for key, fw in unified.items():
+        segments = fw["version"].split(".")
+        numbers = list(map(int, segments))
+        minor_key = f"{numbers[0]}.{numbers[1]}"
+        groups[minor_key].append((numbers, fw))
+
+    latest = []
+    for key, group in groups.items():
+        group.sort(key=lambda x: x[0])
+        latest.append(group[-1])
+
+    latest.sort(key=lambda x: x[0])
+    return [x[1] for x in latest]
 
 
 def find_missing(firmwares: list[dict], data_repo: Path, group: str) -> list[dict]:
