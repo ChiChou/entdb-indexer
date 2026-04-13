@@ -10,6 +10,7 @@ permissions:
 
 env:
   DATA_REPO: ChiChou/entdb-data
+  ENTDB_MIN_IOS_MAJOR: "18"
 
 jobs:
   update:

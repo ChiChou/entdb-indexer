@@ -11,7 +11,7 @@ from stages.discover import fetch_ios_firmwares, fetch_mac_firmwares, find_missi
 from cli import export_xml, _update_list_json
 
 
-def _min_ios_major(default=11) -> int:
+def _min_ios_major(default=18) -> int:
     value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
     if value is None:
         return default
@@ -92,27 +92,26 @@ def main():
         for fw in missing:
             print(f"  {fw['version']}_{fw['build']}", file=sys.stderr)
 
-        for fw in missing:
-            version = fw["version"]
-            build = fw["build"]
-            url = fw["url"]
-            tag = f"{version}_{build}"
+        # Process only one firmware per run to avoid timeouts; subsequent runs
+        # will pick up the next missing firmware.
+        fw = missing[0]
+        version = fw["version"]
+        build = fw["build"]
+        url = fw["url"]
+        tag = f"{version}_{build}"
 
-            print(f"Processing {group} {tag}...", file=sys.stderr)
+        print(f"Processing {group} {tag}...", file=sys.stderr)
 
-            try:
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    ipsw_path = Path(tmpdir) / "firmware.ipsw"
-                    db_path = Path(tmpdir) / f"{tag}.db"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ipsw_path = Path(tmpdir) / "firmware.ipsw"
+            db_path = Path(tmpdir) / f"{tag}.db"
 
-                    subprocess.check_call(["curl", "--fail", "-L", "-o", str(ipsw_path), url])
-                    subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
-                    export_xml(str(db_path), data_repo, group)
+            subprocess.check_call(["curl", "--fail", "-L", "-o", str(ipsw_path), url])
+            subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
+            export_xml(str(db_path), data_repo, group)
 
-                print(f"Done: {group} {tag}", file=sys.stderr)
-            except subprocess.CalledProcessError as e:
-                print(f"Failed: {group} {tag}: {e}", file=sys.stderr)
-                continue
+        print(f"Done: {group} {tag}", file=sys.stderr)
+        return  # Exit after processing one firmware
 
 
 if __name__ == "__main__":
