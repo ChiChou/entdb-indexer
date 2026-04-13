@@ -6,6 +6,7 @@ import subprocess
 import shutil
 import tempfile
 import argparse
+import sys
 
 from ipsw.reader import Reader
 from ipsw.aea import get_key
@@ -57,7 +58,15 @@ def build_database(ipsw: str, output: Path, merge: bool):
         for name, path in reader.images.items():
             dest = Path(cwd) / f"{reader.version}-{name}.dmg"
 
-            subprocess.call(["unzip", reader.ipsw, path], cwd=cwd)
+            try:
+                subprocess.check_call(["unzip", reader.ipsw, path], cwd=cwd)
+            except FileNotFoundError:
+                print("warning: unzip not found; skipping image", file=sys.stderr)
+                continue
+            except subprocess.CalledProcessError:
+                print(f"warning: unable to extract {path}; skipping image", file=sys.stderr)
+                continue
+
             dmg = Path(cwd) / path
 
             if path.endswith(".dmg.aea"):
@@ -65,18 +74,25 @@ def build_database(ipsw: str, output: Path, merge: bool):
                     key = get_key(fp)
 
                 b64key = base64.b64encode(key).decode()
-                subprocess.call(
-                    [
-                        "aea",
-                        "decrypt",
-                        "-i",
-                        str(dmg),
-                        "-o",
-                        dest,
-                        "-key-value",
-                        f"base64:{b64key}",
-                    ]
-                )
+                try:
+                    subprocess.check_call(
+                        [
+                            "aea",
+                            "decrypt",
+                            "-i",
+                            str(dmg),
+                            "-o",
+                            dest,
+                            "-key-value",
+                            f"base64:{b64key}",
+                        ]
+                    )
+                except FileNotFoundError:
+                    print("warning: aea not found; skipping encrypted AEA image", file=sys.stderr)
+                    continue
+                except subprocess.CalledProcessError:
+                    print("warning: aea decrypt failed; skipping image", file=sys.stderr)
+                    continue
                 dmg.unlink()
 
             elif image_backend.probe(str(dmg)).encrypted is True:
@@ -84,7 +100,14 @@ def build_database(ipsw: str, output: Path, merge: bool):
                 page_name = get_page_name(device, reader.build)
                 content = fetch_page(page_name)
                 (key,) = content["rootfs"]["key"]
-                subprocess.call(["vfdecrypt", "-k", key, "-i", str(dmg), "-o", dest])
+                try:
+                    subprocess.check_call(["vfdecrypt", "-k", key, "-i", str(dmg), "-o", dest])
+                except FileNotFoundError:
+                    print("warning: vfdecrypt not found; skipping encrypted DMG image", file=sys.stderr)
+                    continue
+                except subprocess.CalledProcessError:
+                    print("warning: vfdecrypt failed; skipping image", file=sys.stderr)
+                    continue
                 dmg.unlink()
 
             else:

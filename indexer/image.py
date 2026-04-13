@@ -113,6 +113,20 @@ class LinuxApfsFuseBackend(ImageBackend):
             pass
 
 
+class UnavailableImageBackend(ImageBackend):
+    def __init__(self, reason: str):
+        self._reason = reason
+
+    def mount(self, image: str, mount_point: str | None = None) -> str:
+        raise ImageBackendError(self._reason)
+
+    def unmount(self, mount_point: str) -> None:
+        return
+
+    def probe(self, image: str) -> ImageProbe:
+        return ImageProbe(encrypted=None)
+
+
 def get_image_backend() -> ImageBackend:
     override = os.environ.get("ENTDB_IMAGE_BACKEND")
     if override == "macos":
@@ -124,6 +138,10 @@ def get_image_backend() -> ImageBackend:
         return MacOSImageBackend()
 
     if sys.platform.startswith("linux"):
-        return LinuxApfsFuseBackend()
+        try:
+            return LinuxApfsFuseBackend()
+        except ImageBackendError as exc:
+            print(f"warning: {exc}", file=sys.stderr)
+            return UnavailableImageBackend(str(exc))
 
     raise ImageBackendError(f"unsupported platform: {sys.platform}")
