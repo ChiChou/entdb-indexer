@@ -56,9 +56,9 @@ def prune_old_patches(data_repo: Path, group: str):
         groups[key].append((numbers, version, build, d))
 
     removed = []
-    for key, group in groups.items():
-        group.sort(key=lambda x: x[0])
-        for _, version, build, d in group[:-1]:
+    for key, version_group in groups.items():
+        version_group.sort(key=lambda x: x[0])
+        for _, version, build, d in version_group[:-1]:
             shutil.rmtree(d)
             removed.append((version, build))
 
@@ -75,8 +75,6 @@ def main():
     min_ios_major = _min_ios_major()
 
     for group, fetch_fn in [("iOS", fetch_ios_firmwares), ("mac", fetch_mac_firmwares)]:
-        prune_old_patches(data_repo, group)
-
         if group == "iOS":
             firmwares = fetch_ios_firmwares(Path("cache"), min_major=min_ios_major)
         else:
@@ -109,6 +107,9 @@ def main():
             subprocess.check_call(["curl", "--fail", "-L", "-o", str(ipsw_path), url])
             subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
             export_xml(str(db_path), data_repo, group)
+
+        # Prune old patches only after successful processing
+        prune_old_patches(data_repo, group)
 
         print(f"Done: {group} {tag}", file=sys.stderr)
         return  # Exit after processing one firmware
