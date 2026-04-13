@@ -73,15 +73,19 @@ def main():
 
             print(f"Processing {group} {tag}...")
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                ipsw_path = Path(tmpdir) / "firmware.ipsw"
-                db_path = Path(tmpdir) / f"{tag}.db"
+            try:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    ipsw_path = Path(tmpdir) / "firmware.ipsw"
+                    db_path = Path(tmpdir) / f"{tag}.db"
 
-                subprocess.check_call(["curl", "-L", "-o", str(ipsw_path), url])
-                subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
-                export_xml(str(db_path), data_repo, group)
+                    subprocess.check_call(["curl", "--fail", "-L", "-o", str(ipsw_path), url])
+                    subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
+                    export_xml(str(db_path), data_repo, group)
 
-            print(f"Done: {group} {tag}")
+                print(f"Done: {group} {tag}")
+            except subprocess.CalledProcessError as e:
+                print(f"Failed: {group} {tag}: {e}")
+                continue
 
 
 if __name__ == "__main__":
