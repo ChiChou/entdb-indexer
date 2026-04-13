@@ -62,7 +62,7 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 2:
-        print("Usage: python aea.py <path>")
+        print("Usage: python aea.py <path>", file=sys.stderr)
         sys.exit(1)
 
     with open(sys.argv[1], "rb") as f:

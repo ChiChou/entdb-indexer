@@ -60,7 +60,7 @@ def export_xml(db_path: str, output: Path, group: str):
             xml_path.write_bytes(b["xml"])
 
         new_entries.append(os_info)
-        print(f"exported {group}/{tag}")
+        print(f"exported {group}/{tag}", file=sys.stderr)
 
     group_dir = output / group
     group_dir.mkdir(parents=True, exist_ok=True)
@@ -81,7 +81,7 @@ def main():
     if args.command == "export-xml":
         export_xml(args.db, Path(args.output), args.group)
     else:
-        parser.print_help()
+        parser.print_help(sys.stderr)
         sys.exit(1)
 
 

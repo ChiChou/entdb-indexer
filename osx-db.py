@@ -2,6 +2,7 @@
 
 import subprocess
 import stat
+import sys
 
 from pathlib import Path
 
@@ -68,7 +69,7 @@ def main():
             db = Writer(args.output, name, version, build, ["Mac"])
             results = u.unpack(p)
             for item in results:
-                print("processing", item)
+                print("processing", item, file=sys.stderr)
                 for path, entitlements in read_pkg(item, rd):
                     db.insert(path, entitlements)
 

@@ -10,12 +10,12 @@ import argparse
 from ipsw.reader import Reader
 from ipsw.aea import get_key
 from ipsw.theapplewiki import get_page_name, fetch_page
-from osx.hdiutil import encrypted, mount_to, unmount
 from osx.product import name as macos_name
 from indexer.db import Writer
 from indexer.visitor import FileSystemVisitor
 from indexer.detect import is_macho
 from indexer.entitlements import xml as entitlements
+from indexer.image import ImageBackendError, get_image_backend
 
 
 def filesystem_root(name: str):
@@ -32,6 +32,7 @@ def filesystem_root(name: str):
 
 def build_database(ipsw: str, output: Path, merge: bool):
     reader = Reader(ipsw)
+    image_backend = get_image_backend()
 
     dbname = "ent.db" if merge else f'{reader.version}_{reader.build}.db'
     db = str(output / dbname)
@@ -78,7 +79,7 @@ def build_database(ipsw: str, output: Path, merge: bool):
                 )
                 dmg.unlink()
 
-            elif encrypted(str(dmg)):
+            elif image_backend.probe(str(dmg)).encrypted is True:
                 device, *_ = reader.devices
                 page_name = get_page_name(device, reader.build)
                 content = fetch_page(page_name)
@@ -91,18 +92,15 @@ def build_database(ipsw: str, output: Path, merge: bool):
 
             prefix = filesystem_root(name)
             try:
-                root = mount_to(str(dest))
-            except Exception:
+                with image_backend.open(str(dest)) as root:
+                    visitor = FileSystemVisitor(predicate=is_macho)
+                    for path in visitor.visit(Path(root)):
+                        relative = path.resolve().relative_to(root)
+                        absolute = f"{prefix}{relative}"
+                        xml = entitlements(str(path))
+                        writer.insert(absolute, xml)
+            except ImageBackendError:
                 continue
-
-            visitor = FileSystemVisitor(predicate=is_macho)
-            for path in visitor.visit(Path(root)):
-                relative = path.resolve().relative_to(root)
-                absolute = f"{prefix}{relative}"
-                xml = entitlements(str(path))
-                writer.insert(absolute, xml)
-
-            unmount(root)
 
 
 def main():

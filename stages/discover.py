@@ -8,6 +8,8 @@ import json
 import urllib.request
 from pathlib import Path
 from collections import defaultdict
+import os
+import sys
 
 
 def fetch_with_cache(url: str, cache_dir: Path, cache_name: str) -> bytes:
@@ -25,7 +27,20 @@ def fetch_with_cache(url: str, cache_dir: Path, cache_name: str) -> bytes:
     return buf
 
 
-def fetch_ios_firmwares(cache_dir: Path) -> list[dict]:
+def _min_ios_major(default=18) -> int:
+    value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError("ENTDB_MIN_IOS_MAJOR must be an integer") from exc
+
+
+def fetch_ios_firmwares(cache_dir: Path, min_major: int | None = None) -> list[dict]:
+    if min_major is None:
+        min_major = _min_ios_major()
+
     devices = json.loads(fetch_with_cache(
         "https://api.ipsw.me/v4/devices", cache_dir, "devices.json"
     ))
@@ -43,6 +58,10 @@ def fetch_ios_firmwares(cache_dir: Path) -> list[dict]:
 
         for fw in ipsw["firmwares"]:
             version = fw["version"]
+            major = int(version.split(".")[0])
+            if major < min_major:
+                continue
+
             unified[version] = {
                 "url": fw["url"],
                 "model": model,
@@ -150,13 +169,19 @@ def main():
     parser.add_argument("--data-repo", required=True, help="Path to entdb-data checkout")
     parser.add_argument("--group", default="iOS", choices=["iOS", "mac"], help="Group to check")
     parser.add_argument("--batch-size", type=int, default=3, help="Items per batch")
+    parser.add_argument(
+        "--min-ios-major",
+        type=int,
+        default=_min_ios_major(),
+        help="Minimum iOS major version to consider for discovery",
+    )
     parser.add_argument("--cache-dir", default="cache", help="Cache directory")
     args = parser.parse_args()
 
     cache_dir = Path(args.cache_dir)
 
     if args.group == "iOS":
-        firmwares = fetch_ios_firmwares(cache_dir)
+        firmwares = fetch_ios_firmwares(cache_dir, min_major=args.min_ios_major)
     elif args.group == "mac":
         firmwares = fetch_mac_firmwares(cache_dir)
     else:
@@ -165,12 +190,12 @@ def main():
     missing = find_missing(firmwares, Path(args.data_repo), args.group)
 
     if not missing:
-        print("No new versions found")
+        print("No new versions found", file=sys.stderr)
         return
 
-    print(f"Found {len(missing)} new version(s):")
+    print(f"Found {len(missing)} new version(s):", file=sys.stderr)
     for fw in missing:
-        print(f"  {fw['version']}_{fw['build']}")
+        print(f"  {fw['version']}_{fw['build']}", file=sys.stderr)
 
     batches = split_into_batches(missing, args.batch_size)
     print(json.dumps({"batches": batches, "total_missing": len(missing)}))

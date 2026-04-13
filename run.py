@@ -3,11 +3,31 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import os
 from collections import defaultdict
 from pathlib import Path
 
 from stages.discover import fetch_ios_firmwares, fetch_mac_firmwares, find_missing
 from cli import export_xml, _update_list_json
+
+
+def _min_ios_major(default=11) -> int:
+    value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError("ENTDB_MIN_IOS_MAJOR must be an integer") from exc
+
+
+def _check_runtime_tools() -> None:
+    # Current extractor still shells out to codesign.
+    if shutil.which("codesign") is None:
+        raise RuntimeError(
+            "codesign command is required by the current extractor; "
+            "set up the C entitlement helper first for Linux runs"
+        )
 
 
 def prune_old_patches(data_repo: Path, group: str):
@@ -45,25 +65,32 @@ def prune_old_patches(data_repo: Path, group: str):
     if removed:
         _update_list_json(group_dir, [])
         for version, build in removed:
-            print(f"Removed old {group} {version}_{build}")
+            print(f"Removed old {group} {version}_{build}", file=sys.stderr)
 
 
 def main():
+    _check_runtime_tools()
+
     data_repo = Path("entdb-data")
+    min_ios_major = _min_ios_major()
 
     for group, fetch_fn in [("iOS", fetch_ios_firmwares), ("mac", fetch_mac_firmwares)]:
         prune_old_patches(data_repo, group)
 
-        firmwares = fetch_fn(Path("cache"))
+        if group == "iOS":
+            firmwares = fetch_ios_firmwares(Path("cache"), min_major=min_ios_major)
+        else:
+            firmwares = fetch_fn(Path("cache"))
+
         missing = find_missing(firmwares, data_repo, group)
 
         if not missing:
-            print(f"No new {group} versions")
+            print(f"No new {group} versions", file=sys.stderr)
             continue
 
-        print(f"Found {len(missing)} new {group} version(s):")
+        print(f"Found {len(missing)} new {group} version(s):", file=sys.stderr)
         for fw in missing:
-            print(f"  {fw['version']}_{fw['build']}")
+            print(f"  {fw['version']}_{fw['build']}", file=sys.stderr)
 
         for fw in missing:
             version = fw["version"]
@@ -71,7 +98,7 @@ def main():
             url = fw["url"]
             tag = f"{version}_{build}"
 
-            print(f"Processing {group} {tag}...")
+            print(f"Processing {group} {tag}...", file=sys.stderr)
 
             try:
                 with tempfile.TemporaryDirectory() as tmpdir:
@@ -82,9 +109,9 @@ def main():
                     subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
                     export_xml(str(db_path), data_repo, group)
 
-                print(f"Done: {group} {tag}")
+                print(f"Done: {group} {tag}", file=sys.stderr)
             except subprocess.CalledProcessError as e:
-                print(f"Failed: {group} {tag}: {e}")
+                print(f"Failed: {group} {tag}: {e}", file=sys.stderr)
                 continue
 
 
