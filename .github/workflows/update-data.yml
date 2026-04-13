@@ -30,6 +30,14 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Build vfdecrypt
+        run: |
+          git clone https://github.com/ChiChou/vfdecrypt.git /tmp/vfdecrypt
+          cd /tmp/vfdecrypt
+          PREFIX=$(brew --prefix openssl@3)
+          cc -o vfdecrypt vfdecrypt.c -lcrypto -I"$PREFIX/include" -L"$PREFIX/lib" -Wl,-rpath,"$PREFIX/lib" -Wno-deprecated-declarations
+          cp vfdecrypt /usr/local/bin/
+
       - name: Install Python dependencies
         run: pip install pyhpke
 
