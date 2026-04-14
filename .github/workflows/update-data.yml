@@ -31,7 +31,8 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Build vfdecrypt
+      - name: Build vfdecrypt (only for iOS < 10)
+        if: ${{ fromJson(env.ENTDB_MIN_IOS_MAJOR) < 10 }}
         run: |
           cd vendor/vfdecrypt
           PREFIX=$(brew --prefix openssl@3)
