@@ -1,5 +1,6 @@
 def name(version: str) -> str:
     MACOS_NAMES = {
+        26: "Tahoe",
         15: "Sequoia",
         14: "Sonoma",
         13: "Ventura",

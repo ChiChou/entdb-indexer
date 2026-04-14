@@ -17,6 +17,7 @@ def fetch_with_cache(url: str, cache_dir: Path, cache_name: str) -> bytes:
     local = cache_dir / cache_name
     if local.exists() and local.is_file():
         import time
+
         if local.stat().st_mtime + 86400 > time.time():
             with local.open("rb") as fp:
                 return fp.read()
@@ -41,20 +42,22 @@ def fetch_ios_firmwares(cache_dir: Path, min_major: int | None = None) -> list[d
     if min_major is None:
         min_major = _min_ios_major()
 
-    devices = json.loads(fetch_with_cache(
-        "https://api.ipsw.me/v4/devices", cache_dir, "devices.json"
-    ))
+    devices = json.loads(
+        fetch_with_cache("https://api.ipsw.me/v4/devices", cache_dir, "devices.json")
+    )
     models = [dev["identifier"] for dev in devices]
     phones = [m for m in models if m.startswith("iPhone")]
 
     unified = {}
 
     for model in phones:
-        ipsw = json.loads(fetch_with_cache(
-            f"https://api.ipsw.me/v4/device/{model}?type=ipsw",
-            cache_dir,
-            f"ipsw-{model}.json",
-        ))
+        ipsw = json.loads(
+            fetch_with_cache(
+                f"https://api.ipsw.me/v4/device/{model}?type=ipsw",
+                cache_dir,
+                f"ipsw-{model}.json",
+            )
+        )
 
         for fw in ipsw["firmwares"]:
             version = fw["version"]
@@ -86,25 +89,27 @@ def fetch_ios_firmwares(cache_dir: Path, min_major: int | None = None) -> list[d
         group.sort(key=lambda x: x[0])
         latest.append(group[-1])
 
-    latest.sort(key=lambda x: x[0])
+    latest.sort(key=lambda x: x[0], reverse=True)
     return [x[1] for x in latest]
 
 
 def fetch_mac_firmwares(cache_dir: Path) -> list[dict]:
-    devices = json.loads(fetch_with_cache(
-        "https://api.ipsw.me/v4/devices", cache_dir, "devices.json"
-    ))
+    devices = json.loads(
+        fetch_with_cache("https://api.ipsw.me/v4/devices", cache_dir, "devices.json")
+    )
     macs = [dev["identifier"] for dev in devices if dev["identifier"].startswith("Mac")]
 
     unified = {}
 
     for model in macs:
         try:
-            ipsw = json.loads(fetch_with_cache(
-                f"https://api.ipsw.me/v4/device/{model}?type=ipsw",
-                cache_dir,
-                f"ipsw-{model}.json",
-            ))
+            ipsw = json.loads(
+                fetch_with_cache(
+                    f"https://api.ipsw.me/v4/device/{model}?type=ipsw",
+                    cache_dir,
+                    f"ipsw-{model}.json",
+                )
+            )
         except Exception:
             continue
 
@@ -133,7 +138,7 @@ def fetch_mac_firmwares(cache_dir: Path) -> list[dict]:
         group.sort(key=lambda x: x[0])
         latest.append(group[-1])
 
-    latest.sort(key=lambda x: x[0])
+    latest.sort(key=lambda x: x[0], reverse=True)
     return [x[1] for x in latest]
 
 
@@ -153,7 +158,7 @@ def find_missing(firmwares: list[dict], data_repo: Path, group: str) -> list[dic
 
 
 def split_into_batches(items: list[dict], batch_size: int) -> list[list[dict]]:
-    return [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+    return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
 
 def fetch_firmware_list(cache_dir: Path | None = None) -> list[dict]:
@@ -166,8 +171,12 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Discover new firmware versions")
-    parser.add_argument("--data-repo", required=True, help="Path to entdb-data checkout")
-    parser.add_argument("--group", default="iOS", choices=["iOS", "mac"], help="Group to check")
+    parser.add_argument(
+        "--data-repo", required=True, help="Path to entdb-data checkout"
+    )
+    parser.add_argument(
+        "--group", default="iOS", choices=["iOS", "mac"], help="Group to check"
+    )
     parser.add_argument("--batch-size", type=int, default=3, help="Items per batch")
     parser.add_argument(
         "--min-ios-major",

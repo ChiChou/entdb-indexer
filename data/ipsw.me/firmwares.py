@@ -62,7 +62,7 @@ def main():
         group.sort(key=lambda x: x[0])
         latest_minor_versions.append(group[-1])
 
-    latest_minor_versions.sort(key=lambda x: x[0])
+    latest_minor_versions.sort(key=lambda x: x[0], reverse=True)
     result = [x[1] for x in latest_minor_versions]
 
     print(json.dumps(result, indent=2))
