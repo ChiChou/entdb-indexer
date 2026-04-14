@@ -33,6 +33,8 @@ def filesystem_root(name: str):
 
 
 def build_database(ipsw: str, output: Path, merge: bool):
+    # Convert to absolute path so it works when running commands from temp directories
+    ipsw = str(Path(ipsw).resolve())
     reader = Reader(ipsw)
     image_backend = get_image_backend()
 
@@ -69,11 +71,11 @@ def build_database(ipsw: str, output: Path, merge: bool):
             try:
                 subprocess.check_call(["unzip", reader.ipsw, path], cwd=cwd)
             except FileNotFoundError:
-                print("warning: unzip not found; skipping image", file=sys.stderr)
-                continue
-            except subprocess.CalledProcessError:
-                print(f"warning: unable to extract {path}; skipping image", file=sys.stderr)
-                continue
+                print("error: unzip not found", file=sys.stderr)
+                sys.exit(1)
+            except subprocess.CalledProcessError as e:
+                print(f"error: unable to extract {path} from {reader.ipsw}", file=sys.stderr)
+                sys.exit(e.returncode or 1)
 
             dmg = Path(cwd) / path
             actual_size = dmg.stat().st_size

@@ -10,6 +10,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cli import export_xml, _update_list_json
+from indexer.db import Reader
+
+
+def validate_database(db_path: str):
+    """Ensure database has actual content before exporting."""
+    reader = Reader(db_path)
+    os_entries = reader.all_os()
+    if not os_entries:
+        print(f"error: database {db_path} has no OS entries", file=sys.stderr)
+        sys.exit(1)
+
+    for os_info in os_entries:
+        paths = reader.paths(os_info["build"])
+        if not paths:
+            print(f"error: database {db_path} has no binary entries for {os_info['build']}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Validated {db_path}: {len(paths)} binaries for {os_info['version']}_{os_info['build']}", file=sys.stderr)
 
 
 def prune_old_patches(data_repo: Path, group: str):
@@ -59,6 +76,7 @@ def main():
     args = parser.parse_args()
 
     data_repo = Path(args.data_repo)
+    validate_database(args.db)
     export_xml(args.db, data_repo, args.group)
     prune_old_patches(data_repo, args.group)
     print(f"Exported {args.db} to {data_repo}/{args.group}", file=sys.stderr)
