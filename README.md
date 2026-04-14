@@ -26,3 +26,14 @@ OSX (pre-Big Sur) is considered complete and is not checked for updates.
 - macOS system tools: `codesign`, `hdiutil`, `diskutil`
 - Optional: `aea`, `vfdecrypt`, `pbzx`, `mist-cli`
 - Python dependency: `pyhpke>=0.6.2`
+
+## Related Repositories
+
+| Repository | Description |
+|------------|-------------|
+| [entdb](https://github.com/ChiChou/entdb) | Web frontend |
+| [entdb-data](https://github.com/ChiChou/entdb-data) | Raw entitlement data |
+
+## License
+
+MIT
