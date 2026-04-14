@@ -18,15 +18,11 @@ jobs:
     steps:
       - name: Free up disk space
         run: |
-          echo "Before cleanup:"
-          df -h /
-          # Remove Xcode and simulators (not needed for this workflow)
-          sudo rm -rf /Applications/Xcode*.app
-          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
-          sudo rm -rf ~/Library/Developer/Xcode/DerivedData/*
-          sudo rm -rf ~/Library/Developer/Xcode/Archives/*
-          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*
-          echo "After cleanup:"
+          # Remove Xcode and simulators in parallel (not needed for this workflow)
+          sudo rm -rf /Applications/Xcode*.app &
+          rm -rf ~/Library/Developer/CoreSimulator &
+          rm -rf ~/Library/Developer/Xcode &
+          wait
           df -h /
 
       - name: Checkout indexer
