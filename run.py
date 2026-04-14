@@ -74,6 +74,8 @@ def main():
     data_repo = Path("entdb-data")
     min_ios_major = _min_ios_major()
 
+    # Collect all missing firmwares across platforms
+    all_missing = []
     for group, fetch_fn in [("iOS", fetch_ios_firmwares), ("mac", fetch_mac_firmwares)]:
         if group == "iOS":
             firmwares = fetch_ios_firmwares(Path("cache"), min_major=min_ios_major)
@@ -81,38 +83,39 @@ def main():
             firmwares = fetch_fn(Path("cache"))
 
         missing = find_missing(firmwares, data_repo, group)
-
-        if not missing:
-            print(f"No new {group} versions", file=sys.stderr)
-            continue
-
-        print(f"Found {len(missing)} new {group} version(s):", file=sys.stderr)
         for fw in missing:
-            print(f"  {fw['version']}_{fw['build']}", file=sys.stderr)
+            all_missing.append((group, fw))
 
-        # Process only one firmware per run to avoid timeouts; subsequent runs
-        # will pick up the next missing firmware.
-        fw = missing[0]
-        version = fw["version"]
-        build = fw["build"]
-        url = fw["url"]
-        tag = f"{version}_{build}"
+    if not all_missing:
+        print("No new versions for any platform", file=sys.stderr)
+        return
 
-        print(f"Processing {group} {tag}...", file=sys.stderr)
+    print(f"Found {len(all_missing)} total missing version(s):", file=sys.stderr)
+    for group, fw in all_missing:
+        print(f"  {group}: {fw['version']}_{fw['build']}", file=sys.stderr)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            ipsw_path = Path(tmpdir) / "firmware.ipsw"
-            db_path = Path(tmpdir) / f"{tag}.db"
+    # Process only one firmware per run to avoid timeouts; subsequent runs
+    # will pick up the next missing firmware.
+    group, fw = all_missing[0]
+    version = fw["version"]
+    build = fw["build"]
+    url = fw["url"]
+    tag = f"{version}_{build}"
 
-            subprocess.check_call(["curl", "--fail", "-L", "-o", str(ipsw_path), url])
-            subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
-            export_xml(str(db_path), data_repo, group)
+    print(f"Processing {group} {tag}...", file=sys.stderr)
 
-        # Prune old patches only after successful processing
-        prune_old_patches(data_repo, group)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ipsw_path = Path(tmpdir) / "firmware.ipsw"
+        db_path = Path(tmpdir) / f"{tag}.db"
 
-        print(f"Done: {group} {tag}", file=sys.stderr)
-        return  # Exit after processing one firmware
+        subprocess.check_call(["curl", "--fail", "-L", "-o", str(ipsw_path), url])
+        subprocess.check_call([sys.executable, "ipsw-db.py", str(ipsw_path), "-o", tmpdir])
+        export_xml(str(db_path), data_repo, group)
+
+    # Prune old patches only after successful processing
+    prune_old_patches(data_repo, group)
+
+    print(f"Done: {group} {tag}", file=sys.stderr)
 
 
 if __name__ == "__main__":
