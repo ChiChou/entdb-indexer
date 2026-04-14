@@ -42,6 +42,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install pyhpke
 
+      - name: Check disk space before processing
+        run: df -h /
+
       - name: Discover and process new entries
         run: python run.py
 
