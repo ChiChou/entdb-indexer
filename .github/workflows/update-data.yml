@@ -33,8 +33,7 @@ jobs:
 
       - name: Build vfdecrypt
         run: |
-          git clone https://github.com/ChiChou/vfdecrypt.git /tmp/vfdecrypt
-          cd /tmp/vfdecrypt
+          cd vendor/vfdecrypt
           PREFIX=$(brew --prefix openssl@3)
           cc -o vfdecrypt vfdecrypt.c -lcrypto -I"$PREFIX/include" -L"$PREFIX/lib" -Wl,-rpath,"$PREFIX/lib" -Wno-deprecated-declarations
           cp vfdecrypt /usr/local/bin/
