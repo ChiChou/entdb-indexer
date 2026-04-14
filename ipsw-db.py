@@ -91,7 +91,7 @@ def build_database(ipsw: str, output: Path, merge: bool):
                     continue
                 if result.returncode != 0:
                     print(f"error: aea decrypt failed for {path} (exit {result.returncode})", file=sys.stderr)
-                    print(f"  command: {' '.join(cmd)}", file=sys.stderr)
+                    print(f"  command: {' '.join(str(a) for a in cmd)}", file=sys.stderr)
                     if result.stdout.strip():
                         print(f"  stdout: {result.stdout.strip()}", file=sys.stderr)
                     if result.stderr.strip():
