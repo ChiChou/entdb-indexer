@@ -16,15 +16,6 @@ jobs:
   update:
     runs-on: macos-latest
     steps:
-      - name: Free up disk space
-        run: |
-          # Remove Xcode and simulators in parallel (not needed for this workflow)
-          sudo rm -rf /Applications/Xcode*.app &
-          rm -rf ~/Library/Developer/CoreSimulator &
-          rm -rf ~/Library/Developer/Xcode &
-          wait
-          df -h /
-
       - name: Checkout indexer
         uses: actions/checkout@v4
 
