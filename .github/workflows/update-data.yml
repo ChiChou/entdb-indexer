@@ -42,8 +42,41 @@ jobs:
       - name: Install Python dependencies
         run: pip install pyhpke
 
-      - name: Discover and process new entries
-        run: python run.py
+      - name: Check runtime tools
+        run: which codesign aea
+
+      - name: Discover missing firmwares
+        id: discover
+        run: |
+          FIRMWARE=$(python scripts/discover.py)
+          if [ -z "$FIRMWARE" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "firmware=$FIRMWARE" >> $GITHUB_OUTPUT
+          echo "group=$(echo $FIRMWARE | jq -r .group)" >> $GITHUB_OUTPUT
+          echo "version=$(echo $FIRMWARE | jq -r .version)" >> $GITHUB_OUTPUT
+          echo "build=$(echo $FIRMWARE | jq -r .build)" >> $GITHUB_OUTPUT
+          echo "url=$(echo $FIRMWARE | jq -r .url)" >> $GITHUB_OUTPUT
+
+      - name: Download IPSW
+        if: steps.discover.outputs.skip != 'true'
+        run: |
+          echo "Downloading ${{ steps.discover.outputs.group }} ${{ steps.discover.outputs.version }}_${{ steps.discover.outputs.build }}"
+          curl --fail -L -o firmware.ipsw "${{ steps.discover.outputs.url }}"
+          ls -lh firmware.ipsw
+
+      - name: Process IPSW
+        if: steps.discover.outputs.skip != 'true'
+        run: |
+          python ipsw-db.py firmware.ipsw -o .
+          ls -lh *.db
+
+      - name: Export to data repo
+        if: steps.discover.outputs.skip != 'true'
+        run: |
+          DB="${{ steps.discover.outputs.version }}_${{ steps.discover.outputs.build }}.db"
+          python scripts/export.py "$DB" "${{ steps.discover.outputs.group }}"
 
       - name: Commit and push
         working-directory: entdb-data
