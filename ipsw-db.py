@@ -74,25 +74,29 @@ def build_database(ipsw: str, output: Path, merge: bool):
                     key = get_key(fp)
 
                 b64key = base64.b64encode(key).decode()
+                cmd = [
+                        "aea",
+                        "decrypt",
+                        "-i",
+                        str(dmg),
+                        "-o",
+                        dest,
+                        "-key-value",
+                        f"base64:{b64key}",
+                    ]
                 try:
-                    subprocess.check_call(
-                        [
-                            "aea",
-                            "decrypt",
-                            "-i",
-                            str(dmg),
-                            "-o",
-                            dest,
-                            "-key-value",
-                            f"base64:{b64key}",
-                        ]
-                    )
+                    result = subprocess.run(cmd, capture_output=True, text=True)
                 except FileNotFoundError:
                     print("warning: aea not found; skipping encrypted AEA image", file=sys.stderr)
                     continue
-                except subprocess.CalledProcessError:
-                    print("warning: aea decrypt failed; skipping image", file=sys.stderr)
-                    continue
+                if result.returncode != 0:
+                    print(f"error: aea decrypt failed for {path} (exit {result.returncode})", file=sys.stderr)
+                    print(f"  command: {' '.join(cmd)}", file=sys.stderr)
+                    if result.stdout.strip():
+                        print(f"  stdout: {result.stdout.strip()}", file=sys.stderr)
+                    if result.stderr.strip():
+                        print(f"  stderr: {result.stderr.strip()}", file=sys.stderr)
+                    sys.exit(result.returncode or 1)
                 dmg.unlink()
 
             elif image_backend.probe(str(dmg)).encrypted is True:
@@ -100,14 +104,20 @@ def build_database(ipsw: str, output: Path, merge: bool):
                 page_name = get_page_name(device, reader.build)
                 content = fetch_page(page_name)
                 (key,) = content["rootfs"]["key"]
+                vfdecrypt_cmd = ["vfdecrypt", "-k", key, "-i", str(dmg), "-o", dest]
                 try:
-                    subprocess.check_call(["vfdecrypt", "-k", key, "-i", str(dmg), "-o", dest])
+                    vf_result = subprocess.run(vfdecrypt_cmd, capture_output=True, text=True)
                 except FileNotFoundError:
                     print("warning: vfdecrypt not found; skipping encrypted DMG image", file=sys.stderr)
                     continue
-                except subprocess.CalledProcessError:
-                    print("warning: vfdecrypt failed; skipping image", file=sys.stderr)
-                    continue
+                if vf_result.returncode != 0:
+                    print(f"error: vfdecrypt failed for {path} (exit {vf_result.returncode}); aborting", file=sys.stderr)
+                    print(f"  command: {' '.join(vfdecrypt_cmd)}", file=sys.stderr)
+                    if vf_result.stdout.strip():
+                        print(f"  stdout: {vf_result.stdout.strip()}", file=sys.stderr)
+                    if vf_result.stderr.strip():
+                        print(f"  stderr: {vf_result.stderr.strip()}", file=sys.stderr)
+                    sys.exit(vf_result.returncode or 1)
                 dmg.unlink()
 
             else:
