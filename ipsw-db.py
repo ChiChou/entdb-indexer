@@ -148,7 +148,12 @@ def build_database(ipsw: str, output: Path, merge: bool):
                         xml = entitlements(str(path))
                         writer.insert(absolute, xml)
             except ImageBackendError:
-                continue
+                pass
+            finally:
+                # Clean up decrypted DMG immediately to save disk space
+                if dest.exists():
+                    dest.unlink()
+                    print(f"Cleaned up {dest.name}", file=sys.stderr)
 
 
 def main():

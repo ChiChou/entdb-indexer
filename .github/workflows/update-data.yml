@@ -16,6 +16,19 @@ jobs:
   update:
     runs-on: macos-latest
     steps:
+      - name: Free up disk space
+        run: |
+          echo "Before cleanup:"
+          df -h /
+          # Remove Xcode and simulators (not needed for this workflow)
+          sudo rm -rf /Applications/Xcode*.app
+          sudo rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+          sudo rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          sudo rm -rf ~/Library/Developer/Xcode/Archives/*
+          sudo rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/*
+          echo "After cleanup:"
+          df -h /
+
       - name: Checkout indexer
         uses: actions/checkout@v4
 
@@ -41,9 +54,6 @@ jobs:
 
       - name: Install Python dependencies
         run: pip install pyhpke
-
-      - name: Check disk space before processing
-        run: df -h /
 
       - name: Discover and process new entries
         run: python run.py
