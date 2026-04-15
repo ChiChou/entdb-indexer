@@ -11,6 +11,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from stages.discover import fetch_ios_firmwares, fetch_mac_firmwares, find_missing
 
 
+# Firmwares that are no longer available from Apple CDN (403 errors)
+SKIP_BUILDS = {
+    "24C2101",  # mac 15.2 - 403 from CDN
+}
+
+
 def _min_ios_major(default=18) -> int:
     value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
     if value is None:
@@ -34,6 +40,9 @@ def main():
 
         missing = find_missing(firmwares, data_repo, group)
         for fw in missing:
+            if fw["build"] in SKIP_BUILDS:
+                print(f"Skipping {group} {fw['version']}_{fw['build']} (unavailable)", file=sys.stderr)
+                continue
             all_missing.append((group, fw))
 
     if not all_missing:
