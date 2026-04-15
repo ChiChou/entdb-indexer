@@ -32,7 +32,7 @@ def name(version: str) -> str:
     major, *minor = map(int, version.split("."))
     minor = minor[0] if minor else 0
 
-    if major >= 26:
+    if major > 26:
         return f"macOS {major}.{minor}"
 
     if major >= 11:
