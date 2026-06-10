@@ -20,16 +20,26 @@ from indexer.entitlements import xml as entitlements
 from indexer.image import ImageBackendError, get_image_backend
 
 
+# Mount point of each cryptex relative to the device root. macOS 27 added the
+# Rosetta cryptex (Cryptex1,RosettaOS), which previously shipped as a separate
+# on-demand install on the Data volume.
+CRYPTEX_ROOTS = {
+    "Cryptex1,SystemOS": "/System/Cryptexes/OS/",
+    "Cryptex1,AppOS": "/System/Cryptexes/App/",
+    "Cryptex1,RosettaOS": "/System/Cryptexes/Rosetta/",
+}
+
+
 def filesystem_root(name: str):
+    """Return the device-root prefix for an image component, or None if unknown.
+
+    Unknown components are skipped (not fatal) so a newly introduced cryptex
+    does not abort processing of the rest of the firmware.
+    """
     if name in ("OS", "User"):
         return "/"
 
-    if name == "Cryptex1,SystemOS":
-        return "/System/Cryptexes/OS/"
-    elif name == "Cryptex1,AppOS":
-        return "/System/Cryptexes/App/"
-
-    raise ValueError(f"Unknown name: {name}")
+    return CRYPTEX_ROOTS.get(name)
 
 
 def build_database(ipsw: str, output: Path, merge: bool):
@@ -94,6 +104,13 @@ def build_database(ipsw: str, output: Path, merge: bool):
 
         # Phase 3: Process each image one by one
         for name, (path, dmg) in extracted.items():
+            prefix = filesystem_root(name)
+            if prefix is None:
+                print(f"warning: unknown image component {name!r}; skipping", file=sys.stderr)
+                if dmg.exists():
+                    dmg.unlink()
+                continue
+
             dest = Path(cwd) / f"{reader.version}-{name}.dmg"
 
             if path.endswith(".dmg.aea"):
@@ -150,7 +167,6 @@ def build_database(ipsw: str, output: Path, merge: bool):
             else:
                 shutil.move(dmg, dest)
 
-            prefix = filesystem_root(name)
             try:
                 with image_backend.open(str(dest)) as root:
                     visitor = FileSystemVisitor(predicate=is_macho)
