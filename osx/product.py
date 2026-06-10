@@ -1,5 +1,6 @@
 def name(version: str) -> str:
     MACOS_NAMES = {
+        27: "Golden Gate",
         26: "Tahoe",
         15: "Sequoia",
         14: "Sonoma",
@@ -32,7 +33,7 @@ def name(version: str) -> str:
     major, *minor = map(int, version.split("."))
     minor = minor[0] if minor else 0
 
-    if major > 26:
+    if major > 27:
         return f"macOS {major}.{minor}"
 
     if major >= 11:
