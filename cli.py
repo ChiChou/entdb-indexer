@@ -26,11 +26,13 @@ def _update_list_json(group_dir: Path, new_entries: list[dict]):
         fp.write("\n")
 
 
-def export_xml(db_path: str, output: Path, group: str):
+def export_xml(db_path: str, output: Path, group: str, beta: bool = False):
     reader = Reader(db_path)
     new_entries = []
 
     for os_info in reader.all_os():
+        if beta:
+            os_info["beta"] = True
         build = os_info["build"]
         version = os_info["version"]
         tag = f"{version}_{build}"
@@ -75,11 +77,12 @@ def main():
     export.add_argument("db", help="Path to SQLite database")
     export.add_argument("-o", "--output", default=".", help="Output directory")
     export.add_argument("-g", "--group", required=True, help="Group name (iOS, mac, osx)")
+    export.add_argument("--beta", action="store_true", help="Tag entries as pre-release betas")
 
     args = parser.parse_args()
 
     if args.command == "export-xml":
-        export_xml(args.db, Path(args.output), args.group)
+        export_xml(args.db, Path(args.output), args.group, beta=args.beta)
     else:
         parser.print_help(sys.stderr)
         sys.exit(1)

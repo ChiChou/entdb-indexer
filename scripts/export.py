@@ -9,8 +9,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from cli import export_xml, _update_list_json
+from cli import export_xml
 from indexer.db import Reader
+
+
+def _prune_list_json(group_dir: Path, removed_builds: set):
+    """Drop pruned builds from list.json so it stays in sync with disk."""
+    list_path = group_dir / "list.json"
+    if not list_path.exists():
+        return
+    with list_path.open() as fp:
+        entries = json.load(fp)
+    kept = [e for e in entries if e["build"] not in removed_builds]
+    with list_path.open("w") as fp:
+        json.dump(kept, fp, indent=2)
+        fp.write("\n")
 
 
 def validate_database(db_path: str):
@@ -47,22 +60,31 @@ def prune_old_patches(data_repo: Path, group: str):
         if len(segments) < 2:
             continue
         numbers = list(map(int, segments))
-        entries.append((numbers, info["version"], info["build"], d))
+        entries.append((numbers, info["version"], info["build"], bool(info.get("beta")), d))
 
     groups = defaultdict(list)
-    for numbers, version, build, d in entries:
+    for numbers, version, build, beta, d in entries:
         key = f"{numbers[0]}.{numbers[1]}"
-        groups[key].append((numbers, version, build, d))
+        groups[key].append((numbers, version, build, beta, d))
 
+    removed_builds = set()
     removed = []
     for key, version_group in groups.items():
-        version_group.sort(key=lambda x: x[0])
-        for _, version, build, d in version_group[:-1]:
+        # Within a major.minor bucket keep a single build. A stable build always
+        # wins over a beta of the same version (so a beta is auto-pruned once its
+        # GA ships); among same-status builds the latest version/build wins.
+        stable = [e for e in version_group if not e[3]]
+        keep_pool = stable if stable else version_group
+        keep = max(keep_pool, key=lambda x: (x[0], x[2]))
+        for numbers, version, build, beta, d in version_group:
+            if d == keep[4]:
+                continue
             shutil.rmtree(d)
+            removed_builds.add(build)
             removed.append((version, build))
 
     if removed:
-        _update_list_json(group_dir, [])
+        _prune_list_json(group_dir, removed_builds)
         for version, build in removed:
             print(f"Removed old {group} {version}_{build}", file=sys.stderr)
 
@@ -73,11 +95,12 @@ def main():
     parser.add_argument("db", help="Path to database file")
     parser.add_argument("group", help="Platform group (iOS or mac)")
     parser.add_argument("--data-repo", default="entdb-data", help="Data repo path")
+    parser.add_argument("--beta", action="store_true", help="Tag entries as pre-release betas")
     args = parser.parse_args()
 
     data_repo = Path(args.data_repo)
     validate_database(args.db)
-    export_xml(args.db, data_repo, args.group)
+    export_xml(args.db, data_repo, args.group, beta=args.beta)
     prune_old_patches(data_repo, args.group)
     print(f"Exported {args.db} to {data_repo}/{args.group}", file=sys.stderr)
 

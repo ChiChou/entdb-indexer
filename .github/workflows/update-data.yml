@@ -58,6 +58,7 @@ jobs:
           echo "version=$(echo $FIRMWARE | jq -r .version)" >> $GITHUB_OUTPUT
           echo "build=$(echo $FIRMWARE | jq -r .build)" >> $GITHUB_OUTPUT
           echo "url=$(echo $FIRMWARE | jq -r .url)" >> $GITHUB_OUTPUT
+          echo "beta=$(echo $FIRMWARE | jq -r '.beta // false')" >> $GITHUB_OUTPUT
 
       - name: Download IPSW
         if: steps.discover.outputs.skip != 'true'
@@ -76,7 +77,11 @@ jobs:
         if: steps.discover.outputs.skip != 'true'
         run: |
           DB="${{ steps.discover.outputs.version }}_${{ steps.discover.outputs.build }}.db"
-          python scripts/export.py "$DB" "${{ steps.discover.outputs.group }}"
+          BETA=""
+          if [ "${{ steps.discover.outputs.beta }}" = "true" ]; then
+            BETA="--beta"
+          fi
+          python scripts/export.py "$DB" "${{ steps.discover.outputs.group }}" $BETA
 
       - name: Commit and push
         working-directory: entdb-data
