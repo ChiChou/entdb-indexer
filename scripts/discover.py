@@ -2,13 +2,17 @@
 """Discover missing firmware versions and output the first one to process."""
 
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from stages.discover import fetch_ios_firmwares, fetch_mac_firmwares, find_missing
+from stages.discover import (
+    fetch_ios_firmwares,
+    fetch_mac_firmwares,
+    find_missing,
+    _min_ios_major,
+)
 from stages.betas import fetch_ios_betas, fetch_mac_betas
 
 
@@ -16,16 +20,6 @@ from stages.betas import fetch_ios_betas, fetch_mac_betas
 SKIP_BUILDS = {
     "24C2101",  # mac 15.2 - 403 from CDN
 }
-
-
-def _min_ios_major(default=18) -> int:
-    value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise ValueError("ENTDB_MIN_IOS_MAJOR must be an integer") from exc
 
 
 def main():

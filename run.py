@@ -3,22 +3,16 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import os
 from collections import defaultdict
 from pathlib import Path
 
-from stages.discover import fetch_ios_firmwares, fetch_mac_firmwares, find_missing
+from stages.discover import (
+    fetch_ios_firmwares,
+    fetch_mac_firmwares,
+    find_missing,
+    _min_ios_major,
+)
 from cli import export_xml, _update_list_json
-
-
-def _min_ios_major(default=18) -> int:
-    value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise ValueError("ENTDB_MIN_IOS_MAJOR must be an integer") from exc
 
 
 def _check_runtime_tools() -> None:

@@ -28,7 +28,13 @@ def fetch_with_cache(url: str, cache_dir: Path, cache_name: str) -> bytes:
     return buf
 
 
-def _min_ios_major(default=18) -> int:
+# Oldest iOS major still receiving (security) firmware updates from Apple, and
+# therefore worth discovering. Single source of truth for every entry point;
+# override per-run via the ENTDB_MIN_IOS_MAJOR environment variable.
+DEFAULT_MIN_IOS_MAJOR = 12
+
+
+def _min_ios_major(default: int = DEFAULT_MIN_IOS_MAJOR) -> int:
     value = os.environ.get("ENTDB_MIN_IOS_MAJOR")
     if value is None:
         return default

@@ -10,7 +10,9 @@ permissions:
 
 env:
   DATA_REPO: ChiChou/entdb-data
-  ENTDB_MIN_IOS_MAJOR: "18"
+  # Leave ENTDB_MIN_IOS_MAJOR unset so the floor comes from the single source of
+  # truth in code (DEFAULT_MIN_IOS_MAJOR in stages/discover.py). Set it here (or
+  # via workflow_dispatch) only to override the floor for a one-off backfill.
 
 jobs:
   update:
@@ -32,7 +34,9 @@ jobs:
           python-version: "3.13"
 
       - name: Build vfdecrypt (only for iOS < 10)
-        if: ${{ fromJson(env.ENTDB_MIN_IOS_MAJOR) < 10 }}
+        # Defaults to 99 when the override is unset, so the build is skipped
+        # unless a backfill run explicitly lowers the floor below 10.
+        if: ${{ fromJson(env.ENTDB_MIN_IOS_MAJOR || '99') < 10 }}
         run: |
           cd vendor/vfdecrypt
           PREFIX=$(brew --prefix openssl@3)
