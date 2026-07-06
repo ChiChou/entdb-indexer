@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Discover missing firmware versions and output the first one to process."""
+"""Discover missing firmware versions and emit the full queue as JSON.
+
+The queue is ordered by priority: stable builds first, betas last. The
+download step walks this queue and takes the first firmware whose URL is still
+served by Apple's CDN, so an expired build (which 403s) no longer fails the run
+-- it is simply skipped in favour of the next entry.
+"""
 
 import json
 import sys
@@ -16,29 +22,25 @@ from stages.discover import (
 from stages.betas import fetch_ios_betas, fetch_mac_betas
 
 
-# Firmwares that are no longer available from Apple CDN (403 errors)
-SKIP_BUILDS = {
-    "24C2101",  # mac 15.2 - 403 from CDN
-}
-
-
 def main():
     data_repo = Path("entdb-data")
     min_ios_major = _min_ios_major()
 
-    all_missing = []
+    queue = []
     for group, fetch_fn in [("iOS", fetch_ios_firmwares), ("mac", fetch_mac_firmwares)]:
         if group == "iOS":
             firmwares = fetch_ios_firmwares(Path("cache"), min_major=min_ios_major)
         else:
             firmwares = fetch_fn(Path("cache"))
 
-        missing = find_missing(firmwares, data_repo, group)
-        for fw in missing:
-            if fw["build"] in SKIP_BUILDS:
-                print(f"Skipping {group} {fw['version']}_{fw['build']} (unavailable)", file=sys.stderr)
-                continue
-            all_missing.append((group, fw))
+        for fw in find_missing(firmwares, data_repo, group):
+            queue.append({
+                "group": group,
+                "version": fw["version"],
+                "build": fw["build"],
+                "url": fw["url"],
+                "beta": fw.get("beta", False),
+            })
 
     # Betas (scraped from ipsw.dev) live in the same iOS/mac groups as stable
     # so the frontend lists and diffs them like any other build; they carry a
@@ -51,29 +53,24 @@ def main():
             print(f"Beta discovery failed for {group}: {exc}", file=sys.stderr)
             continue
 
-        missing = find_missing(firmwares, data_repo, group)
-        for fw in missing:
-            if fw["build"] in SKIP_BUILDS:
-                print(f"Skipping {group} {fw['version']}_{fw['build']} (unavailable)", file=sys.stderr)
-                continue
-            all_missing.append((group, fw))
+        for fw in find_missing(firmwares, data_repo, group):
+            queue.append({
+                "group": group,
+                "version": fw["version"],
+                "build": fw["build"],
+                "url": fw["url"],
+                "beta": fw.get("beta", False),
+            })
 
-    if not all_missing:
+    if queue:
+        print(f"Found {len(queue)} missing version(s)", file=sys.stderr)
+        for fw in queue:
+            print(f"  {fw['group']} {fw['version']}_{fw['build']}", file=sys.stderr)
+    else:
         print("No new versions", file=sys.stderr)
-        return
 
-    print(f"Found {len(all_missing)} missing version(s)", file=sys.stderr)
-
-    # Output first one as JSON for next step
-    group, fw = all_missing[0]
-    result = {
-        "group": group,
-        "version": fw["version"],
-        "build": fw["build"],
-        "url": fw["url"],
-        "beta": fw.get("beta", False),
-    }
-    print(json.dumps(result))
+    # Emit the whole queue; download.py takes the first URL that works.
+    print(json.dumps(queue))
 
 
 if __name__ == "__main__":

@@ -50,42 +50,30 @@ jobs:
         run: which codesign aea
 
       - name: Discover missing firmwares
-        id: discover
-        run: |
-          FIRMWARE=$(python scripts/discover.py)
-          if [ -z "$FIRMWARE" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          echo "firmware=$FIRMWARE" >> $GITHUB_OUTPUT
-          echo "group=$(echo $FIRMWARE | jq -r .group)" >> $GITHUB_OUTPUT
-          echo "version=$(echo $FIRMWARE | jq -r .version)" >> $GITHUB_OUTPUT
-          echo "build=$(echo $FIRMWARE | jq -r .build)" >> $GITHUB_OUTPUT
-          echo "url=$(echo $FIRMWARE | jq -r .url)" >> $GITHUB_OUTPUT
-          echo "beta=$(echo $FIRMWARE | jq -r '.beta // false')" >> $GITHUB_OUTPUT
+        run: python scripts/discover.py > queue.json
 
       - name: Download IPSW
-        if: steps.discover.outputs.skip != 'true'
-        run: |
-          echo "Downloading ${{ steps.discover.outputs.group }} ${{ steps.discover.outputs.version }}_${{ steps.discover.outputs.build }}"
-          curl --fail -L -o firmware.ipsw "${{ steps.discover.outputs.url }}"
-          ls -lh firmware.ipsw
+        id: download
+        # Walks the queue and downloads the first firmware whose URL still
+        # works, skipping any that 403 from Apple's CDN. Sets skip=true when
+        # nothing in the queue is downloadable.
+        run: python scripts/download.py queue.json firmware.ipsw
 
       - name: Process IPSW
-        if: steps.discover.outputs.skip != 'true'
+        if: steps.download.outputs.skip != 'true'
         run: |
           python ipsw-db.py firmware.ipsw -o .
           ls -lh *.db
 
       - name: Export to data repo
-        if: steps.discover.outputs.skip != 'true'
+        if: steps.download.outputs.skip != 'true'
         run: |
-          DB="${{ steps.discover.outputs.version }}_${{ steps.discover.outputs.build }}.db"
+          DB="${{ steps.download.outputs.version }}_${{ steps.download.outputs.build }}.db"
           BETA=""
-          if [ "${{ steps.discover.outputs.beta }}" = "true" ]; then
+          if [ "${{ steps.download.outputs.beta }}" = "true" ]; then
             BETA="--beta"
           fi
-          python scripts/export.py "$DB" "${{ steps.discover.outputs.group }}" $BETA
+          python scripts/export.py "$DB" "${{ steps.download.outputs.group }}" $BETA
 
       - name: Commit and push
         working-directory: entdb-data
