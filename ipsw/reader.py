@@ -8,11 +8,13 @@ class Reader:
     version: str
     build: str
     devices: list[str]
-    images: dict[str, str]
+    # Distinct (component, archive path) pairs in manifest order. Universal
+    # IPSWs can contain several device-specific images for the same component.
+    images: list[tuple[str, str]]
 
     def __init__(self, ipsw: str):
         self.ipsw = ipsw
-        self.images = {}
+        self.images = []
 
         self.parse_metadata()
 
@@ -21,7 +23,8 @@ class Reader:
         self.build = plist["ProductBuildVersion"]
         self.devices = plist["SupportedProductTypes"]
 
-        self.images = {}
+        self.images = []
+        seen = set()
         for identity in plist["BuildIdentities"]:
             if "Recovery" in identity["Info"]["Variant"]:
                 continue
@@ -32,9 +35,10 @@ class Reader:
 
                 path: str = info.get("Info", {}).get("Path", "")
                 if path.endswith(".dmg") or path.endswith(".dmg.aea"):
-                    if name in self.images:
-                        assert self.images[name] == path
-                    self.images[name] = path
+                    image = (name, path)
+                    if image not in seen:
+                        self.images.append(image)
+                        seen.add(image)
 
     def parse_restore(self, plist: dict):
         self.version = plist["ProductVersion"]
@@ -43,7 +47,7 @@ class Reader:
 
         try:
             restore_images: dict[str, str] = plist["SystemRestoreImages"]
-            self.images = restore_images
+            self.images = list(restore_images.items())
         except KeyError:
             raise NotImplementedError("Unknown restore image format: %r" % plist)
 

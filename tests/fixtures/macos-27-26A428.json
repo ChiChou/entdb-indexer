@@ -1,0 +1,93 @@
+{
+  "ProductVersion": "27.0",
+  "ProductBuildVersion": "26A428",
+  "SupportedProductTypes": [
+    "Mac14,2",
+    "Mac18,5"
+  ],
+  "BuildIdentities": [
+    {
+      "Ap,ProductType": "Mac14,2",
+      "Info": {
+        "DeviceClass": "j413ap",
+        "Variant": "Customer Erase Install (IPSW)"
+      },
+      "Manifest": {
+        "BaseSystem": {
+          "Info": {
+            "Path": "022-20292-673.dmg.aea"
+          }
+        },
+        "Cryptex1,AppOS": {
+          "Info": {
+            "Path": "043-70637-685.dmg"
+          }
+        },
+        "Cryptex1,RosettaOS": {
+          "Info": {
+            "Path": "094-86031-269.dmg"
+          }
+        },
+        "Cryptex1,SystemOS": {
+          "Info": {
+            "Path": "043-70701-646.dmg.aea"
+          }
+        },
+        "OS": {
+          "Info": {
+            "Path": "043-70867-635.dmg.aea"
+          }
+        },
+        "RestoreRamDisk": {
+          "Info": {
+            "Path": "043-70833-682.dmg"
+          }
+        }
+      }
+    },
+    {
+      "Ap,ProductType": "Mac18,5",
+      "Info": {
+        "DeviceClass": "j873gap",
+        "Variant": "Customer Erase Install (IPSW)"
+      },
+      "Manifest": {
+        "Ap,ExclaveOS": {
+          "Info": {
+            "Path": "043-70822-678.dmg.aea"
+          }
+        },
+        "BaseSystem": {
+          "Info": {
+            "Path": "022-20292-673.dmg.aea"
+          }
+        },
+        "Cryptex1,AppOS": {
+          "Info": {
+            "Path": "043-70637-685.dmg"
+          }
+        },
+        "Cryptex1,RosettaOS": {
+          "Info": {
+            "Path": "094-86031-269.dmg"
+          }
+        },
+        "Cryptex1,SystemOS": {
+          "Info": {
+            "Path": "094-72631-342.dmg.aea"
+          }
+        },
+        "OS": {
+          "Info": {
+            "Path": "043-70867-635.dmg.aea"
+          }
+        },
+        "RestoreRamDisk": {
+          "Info": {
+            "Path": "043-70833-682.dmg"
+          }
+        }
+      }
+    }
+  ]
+}

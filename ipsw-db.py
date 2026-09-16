@@ -69,15 +69,14 @@ def build_database(ipsw: str, output: Path, merge: bool):
 
     # Get expected file sizes and extract all images from IPSW first
     expected_sizes = {}
-    paths_to_extract = list(reader.images.values())
     with ZipFile(ipsw, "r") as zf:
         for info in zf.infolist():
             expected_sizes[info.filename] = info.file_size
 
     with tempfile.TemporaryDirectory() as cwd:
         # Phase 1: Extract all images from IPSW
-        extracted = {}
-        for name, path in reader.images.items():
+        extracted = []
+        for name, path in reader.images:
             try:
                 subprocess.check_call(["unzip", reader.ipsw, path], cwd=cwd)
             except FileNotFoundError:
@@ -94,7 +93,7 @@ def build_database(ipsw: str, output: Path, merge: bool):
             if actual_size != expected_size:
                 print(f"error: file size mismatch for {path}: got {actual_size}, expected {expected_size}", file=sys.stderr)
                 sys.exit(1)
-            extracted[name] = (path, dmg)
+            extracted.append((name, path, dmg))
 
         # Phase 2: Delete IPSW to free disk space
         ipsw_path = Path(ipsw)
@@ -103,7 +102,7 @@ def build_database(ipsw: str, output: Path, merge: bool):
         print(f"Deleted IPSW ({ipsw_size:.1f} GB freed)", file=sys.stderr)
 
         # Phase 3: Process each image one by one
-        for name, (path, dmg) in extracted.items():
+        for image_index, (name, path, dmg) in enumerate(extracted):
             prefix = filesystem_root(name)
             if prefix is None:
                 print(f"warning: unknown image component {name!r}; skipping", file=sys.stderr)
@@ -111,7 +110,7 @@ def build_database(ipsw: str, output: Path, merge: bool):
                     dmg.unlink()
                 continue
 
-            dest = Path(cwd) / f"{reader.version}-{name}.dmg"
+            dest = Path(cwd) / f"{reader.version}-{image_index}-{name}.dmg"
 
             if path.endswith(".dmg.aea"):
                 with dmg.open("rb") as fp:

@@ -46,6 +46,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install pyhpke
 
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -v
+
       - name: Check runtime tools
         run: which codesign aea
 
