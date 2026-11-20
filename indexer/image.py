@@ -57,7 +57,12 @@ class MacOSImageBackend(ImageBackend):
         return macos_mount_to(image, mount_point)
 
     def unmount(self, mount_point: str) -> None:
-        macos_unmount(mount_point)
+        # By now every binary has been read; a volume that refuses to detach
+        # must not throw away the indexing run (CI runners are discarded).
+        try:
+            macos_unmount(mount_point)
+        except RuntimeError as e:
+            print(f"warning: {e}; leaving it mounted", file=sys.stderr)
 
     def probe(self, image: str) -> ImageProbe:
         return ImageProbe(encrypted=macos_encrypted(image))

@@ -1,5 +1,7 @@
-import subprocess
 import plistlib
+import subprocess
+import sys
+import time
 
 
 def hdiutil(*args: str) -> bytes:
@@ -24,8 +26,32 @@ def mount_to(dmg: str, mount: str | None = None) -> str:
     raise RuntimeError("not reached")
 
 
+# A plain detach can hang on DiskArbitration for minutes (seen on GitHub's
+# macOS runners right after a big image was walked), so bound each attempt.
+DETACH_TIMEOUT = 120
+DETACH_ATTEMPTS = 3
+
+
 def unmount(mount_point: str) -> None:
-    hdiutil("detach", mount_point)
+    """Detach, retrying with -force; raises if every attempt fails."""
+    error: Exception | None = None
+    for attempt in range(DETACH_ATTEMPTS):
+        args = ["hdiutil", "detach", mount_point]
+        if attempt > 0:
+            args.append("-force")
+        try:
+            subprocess.run(args, check=True, capture_output=True, timeout=DETACH_TIMEOUT)
+            return
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            error = e
+            stderr = getattr(e, "stderr", None) or b""
+            print(
+                f"warning: detach {mount_point} failed (attempt {attempt + 1}): "
+                f"{stderr.decode(errors='replace').strip() or e}",
+                file=sys.stderr,
+            )
+            time.sleep(5 * (attempt + 1))
+    raise RuntimeError(f"unable to detach {mount_point}") from error
 
 
 def encrypted(dmg: str) -> bool:
